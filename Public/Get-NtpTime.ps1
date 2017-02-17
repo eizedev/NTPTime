@@ -88,6 +88,7 @@ Function Get-NtpTime {
 
     }
             #add propertiy $defaultTimeServer
+            $ntpData | Add-Member -NotePropertyName configuredNtpServer -NotePropertyValue $defaultTimeServer
             Write-Output $ntpData 
         }
         
