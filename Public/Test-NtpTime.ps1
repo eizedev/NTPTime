@@ -21,7 +21,7 @@ Function Test-NtpTime {
    Test-ntpTime -computerName pc1, pc2 , pc3 -noDns  
    Determins if computers pc1, pc2, and pc3 are all in sync with pool.ntp.org within at most 10000 milliseconds.
 .EXAMPLE
-    Test-ntpTime -computename pc1 -useConfiguredTimeServer -MaxOffset 10
+     Test-ntpTime -computername PC01 -useConfiguredTimeServer -MaxOffset 10
 
     Tests pc1 time Againts the ntp server's time configured on pc1. Determins if offset is with range of 10 milliseconds
 .OUTPUTS
@@ -31,21 +31,21 @@ Function Test-NtpTime {
 
 [cmdletbinding()]
 param(
+    [string[]]$computerName = $($env:computerName),
     [String]$Server = 'pool.ntp.org',
     [Int]$MaxOffset = 10000,     # (Milliseconds) Throw exception if network time offset is larger
     [Switch]$NoDns,               # Do not attempt to lookup V3 secondary-server referenceIdentifier
-    [Switch]$useConfiguredTimeServer,
-    [string[]]$computerName = $($env:computerName)
-
+    [Switch]$useConfiguredTimeServer
 )
     $offsetExceeded = $false
     foreach ($computer in $computerName){
-        $ntpResutls = get-ntpTime -Server $Server -MaxOffset $MaxOffset -NoDns:$noDns -useDefaultTimeServer:$useConfiguredTimeServer -computerName $computerName -MaxOffsetErrorAction silentlyContinue
-        if ($ntpResutls.offset -gt $maxOffset){
-            write-verbose "[Failed] Actual Offset of $($ntpResutls.offset) exceeds Max off set of $maxOFfset Milliseconds on $computer"
+        write-verbose "flag value is $useConfiguredTimeServer"
+        $ntpResults = get-ntpTime -Server $Server -MaxOffset $MaxOffset -NoDns:$noDns -useConfiguredTimeServer:$useConfiguredTimeServer -computerName $computerName -MaxOffsetErrorAction silentlyContinue
+        if ($ntpResults.offset -gt $maxOffset){
+            write-verbose "[Failed] Actual Offset of $($ntpResults.offset) exceeds Max off set of $maxOFfset Milliseconds on $computer"
             $offsetExceeded = $true
         } else {
-            write-verbose "[Success] Actual Offset of $($ntpResutls.offset) does not exceed Max off set of $maxOFfset Milliseconds on $computer"
+            write-verbose "[Success] Actual Offset of $($ntpResults.offset) does not exceed Max off set of $maxOFfset Milliseconds on $computer"
         }
     }
     if ($offsetExceeded){
@@ -55,6 +55,8 @@ param(
         write-verbose "[Success] Offset of all hosts tested do not exceed Max off set of $maxOFfset Milliseconds."
         write-host $true
     }
+
+
 
 
 }

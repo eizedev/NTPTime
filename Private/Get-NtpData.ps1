@@ -1,8 +1,15 @@
 function Get-NtpData {
+<#
+.EXAMPLE
+   $results = get-ntpTransactionData
+   get-ntpData -NtpTransactionData $results -nodns
+#>
 [cmdletbinding()]
 param(
     [Parameter(Mandatory=$true)]
     $ntpTransactionData,
+
+    [Switch]$NoDns,
 
     [ValidateSet('silentlyContinue', 'continue', 'stop')]
     [String]$MaxOffsetErrorAction = 'continue'
@@ -12,6 +19,15 @@ param(
     $ntpData = $ntpTransactionData.ntpData
     $t1 = $ntpTransactionData.TransactionStart
     $t4 = $ntpTransactionData.TransactionEnd
+
+    # NTP Times are all UTC and are relative to midnight on 1/1/1900
+    $StartOfEpoch = New-Object -TypeName DateTime -ArgumentList (1900,1,1,0,0,0,[DateTimeKind]::Utc)
+
+    Function Convert-OffsetToLocal {
+    Param ([Long]$Offset)
+        # Convert milliseconds since midnight on 1/1/1900 to local time
+        $StartOfEpoch.AddMilliseconds($Offset).ToLocalTime()
+    }
 
     # We now have an NTP response packet in $NtpData to decode.  Start with the LI flag
     # as this is used to indicate errors as well as leap-second information
@@ -49,19 +65,6 @@ param(
     # Calculate the NTP Offset and Delay values
     $Offset = (($t2ms - $t1ms) + ($t3ms-$t4ms))/2
     $Delay = ($t4ms - $t1ms) - ($t3ms - $t2ms)
-
-    # Make sure the result looks sane...
-    If ([Math]::Abs($Offset) -gt $MaxOffset)  {
-
-        write-verbose "MaxOffsetErrorAction set to $MaxOffsetErrorAction"
-        switch ($MaxOffsetErrorAction){
-            'continue' {Write-Error "Network time offset exceeds maximum ($($MaxOffset)ms)"}
-            'silentlyContinue' {write-verbose "Network time offset exceeds maximum ($($MaxOffset)ms)"  }
-            'stop' {Write-Error "Network time offset exceeds maximum ($($MaxOffset)ms)"; exit}
-        }
-        
-
-    }
 
     # Decode other useful parts of the received NTP time packet
 
@@ -197,7 +200,6 @@ param(
         NtpServer           = $Server
         NtpTime             = Convert-OffsetToLocal($t4ms + $Offset)
         Offset              = $Offset
-        DefaultTimeServer   = $defaultTimeServer
         OffsetSeconds       = [Math]::Round($Offset/1000, 3)
         Delay               = $Delay
         ReferenceIdentifier = $ReferenceIdentifier
