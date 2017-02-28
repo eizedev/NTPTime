@@ -53,7 +53,7 @@ param(
         write-host $false
     } else {
         write-verbose "[Success] Offset of all hosts tested do not exceed Max off set of $maxOFfset Milliseconds."
-        write-host $true
+        write-out $true
     }
 
 
