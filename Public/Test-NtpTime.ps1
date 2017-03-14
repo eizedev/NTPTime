@@ -50,7 +50,7 @@ param(
     }
     if ($offsetExceeded){
         write-verbose "[Failed] Offset of at least one host exceed Max off set of $maxOFfset Milliseconds."
-        write-host $false
+        write-Output $false
     } else {
         write-verbose "[Success] Offset of all hosts tested do not exceed Max off set of $maxOFfset Milliseconds."
          Write-Output $true
