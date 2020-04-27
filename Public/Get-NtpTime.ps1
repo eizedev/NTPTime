@@ -1,6 +1,7 @@
-Function Get-NtpTime {
+Function Get-NtpTime
+{
 
-<#
+    <#
 .SYNOPSIS
    Gets (Simple) Network Time Protocol time (SNTP/NTP, rfc-1305, rfc-2030) from a specified server
 .DESCRIPTION
@@ -17,7 +18,7 @@ Function Get-NtpTime {
 .PARAMETER NoDns
    (Switch) If specified do not attempt to resolve Version 3 Secondary Server ReferenceIdentifiers.
 .PARAMETER useConfiguredTimeServer
-   (Switch) If specified use whatever ntp is configured on the computer. 
+   (Switch) If specified use whatever ntp is configured on the computer.
 .PARAMETER MaxOffsetErrorAction
     Set error action to 'silentlyContinue', 'continue', or 'stop'
 .EXAMPLE
@@ -42,54 +43,64 @@ Function Get-NtpTime {
     [OutputType('NtpTime')]
     Param (
         [String]$Server = 'pool.ntp.org',
-        [Int]$MaxOffset = 10000,     # (Milliseconds) Throw exception if network time offset is larger
-        [Switch]$NoDns,               # Do not attempt to lookup V3 secondary-server referenceIdentifier
+        [Int]$MaxOffset = 10000, # (Milliseconds) Throw exception if network time offset is larger
+        [Switch]$NoDns, # Do not attempt to lookup V3 secondary-server referenceIdentifier
         [Switch]$useConfiguredTimeServer,
         [string[]]$computerName = $($env:computerName),
 
         [ValidateSet('silentlyContinue', 'continue', 'stop')]
         [String]$MaxOffsetErrorAction = 'continue'
     )
-        foreach ($computer in $computerName){
+    foreach ($computer in $computerName)
+    {
 
-            if ($computer -eq $($env:computerName)){
-                write-verbose "getting default time server for localhost"
-                $defaultTimeServer = w32tm /query /source 
-            } else {
-                try{
-                    write-verbose "getting default time server for remote comptuer $computer"
-                    $defaultTimeServer = invoke-command -ComputerName $computer -scriptblock {
-                        w32tm /query /source
-                    }
-
-                }catch{
-                    Write-Error "Unable to perform w32tm querry on $computer, Ensure PSremoting is enabled."
+        if ($computer -eq $($env:computerName))
+        {
+            Write-Verbose "getting default time server for localhost"
+            $defaultTimeServer = w32tm /query /source
+        }
+        else
+        {
+            try
+            {
+                Write-Verbose "getting default time server for remote comptuer $computer"
+                $defaultTimeServer = Invoke-Command -ComputerName $computer -scriptblock {
+                    w32tm /query /source
                 }
+
+            }
+            catch
+            {
+                Write-Error "Unable to perform w32tm querry on $computer, Ensure PSremoting is enabled."
+            }
+        }
+
+        if ($useConfiguredTimeServer)
+        {
+            $server = $defaultTimeServer
+            Write-Verbose "Default NTP server for $computer is $defaultTimeServer"
+        }
+        Write-Verbose "Getting transaction data for $computer with ntp server $server"
+        $ntpTransactionData = get-ntpTransactionData -computerName $computer -server $server
+        $ntpData = get-ntpData $ntpTransactionData -MaxOffsetErrorAction:$MaxOffsetErrorAction -noDns:$NoDns
+
+        # Make sure the result looks sane...
+        If ([Math]::Abs($ntpData.Offset) -gt $MaxOffset)
+        {
+
+            Write-Verbose "MaxOffsetErrorAction set to $MaxOffsetErrorAction"
+            switch ($MaxOffsetErrorAction)
+            {
+                'continue' { Write-Error "Network time offset exceeds maximum ($($MaxOffset)ms)" }
+                'silentlyContinue' { Write-Verbose "Network time offset exceeds maximum ($($MaxOffset)ms)" }
+                'stop' { Write-Error "Network time offset exceeds maximum ($($MaxOffset)ms)"; exit }
             }
 
-            if ($useConfiguredTimeServer) {
-                $server = $defaultTimeServer
-                write-verbose "Default NTP server for $computer is $defaultTimeServer" 
-            } 
-            write-verbose "Getting transaction data for $computer with ntp server $server"
-            $ntpTransactionData = get-ntpTransactionData -computerName $computer -server $server 
-            $ntpData = get-ntpData $ntpTransactionData -MaxOffsetErrorAction:$MaxOffsetErrorAction -noDns:$NoDns
 
-            # Make sure the result looks sane...
-            If ([Math]::Abs($ntpData.Offset) -gt $MaxOffset)  {
-
-                write-verbose "MaxOffsetErrorAction set to $MaxOffsetErrorAction"
-                switch ($MaxOffsetErrorAction){
-                    'continue' {Write-Error "Network time offset exceeds maximum ($($MaxOffset)ms)"}
-                    'silentlyContinue' {write-verbose "Network time offset exceeds maximum ($($MaxOffset)ms)"  }
-                    'stop' {Write-Error "Network time offset exceeds maximum ($($MaxOffset)ms)"; exit}
-                }
-                
-
-    }
-            #add propertiy $defaultTimeServer
-            $ntpData | Add-Member -NotePropertyName configuredNtpServer -NotePropertyValue $defaultTimeServer
-            Write-Output $ntpData 
         }
-        
+        #add propertiy $defaultTimeServer
+        $ntpData | Add-Member -NotePropertyName configuredNtpServer -NotePropertyValue $defaultTimeServer
+        Write-Output $ntpData
+    }
+
 }
